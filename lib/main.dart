@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -49,18 +50,15 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-  static const MethodChannel _channel = const MethodChannel("main_channel");
+  static const MethodChannel _channel = MethodChannel("main_channel");
+  static const String CHANNEL_NAME = "my_channel";
+  static const MethodChannel _channel_1 = MethodChannel(CHANNEL_NAME);
+  int? counter;
+  String? storageData;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
   }
 
   @override
@@ -71,6 +69,21 @@ class _MyHomePageState extends State<MyHomePage> {
     // The Flutter framework has been optimized to make rerunning build methods
     // fast, so that you can just rebuild anything that needs updating rather
     // than having to individually change instances of widgets.
+
+    _channel_1.setMethodCallHandler((call) async {
+      if (call.method == "receiveMessage") {
+        String message = call.arguments as String;
+        setState(() {
+          counter = int.parse(message);
+        });
+      } else if (call.method == "storeData") {
+        String message = call.arguments as String;
+        setState(() {
+          storageData = message;
+        });
+        debugPrint(message);
+      }
+    });
     return Scaffold(
       appBar: AppBar(
         // Here we take the value from the MyHomePage object that was created by
@@ -97,6 +110,38 @@ class _MyHomePageState extends State<MyHomePage> {
           // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            if (counter != null) ...[
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  "Redux Store from RN",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Text(
+                '$counter',
+                style: TextStyle(
+                  fontSize: 90,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
+            if (storageData != null) ...[
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  "Local Storage Data from RN",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  '$storageData',
+                  style: TextStyle(),
+                ),
+              ),
+            ],
             ElevatedButton(
                 onPressed: _getNewActivity,
                 child: const Text("Open React Native View")),
