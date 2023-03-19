@@ -1,22 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TouchableHighlight, NativeModules, AppRegistry, Button } from 'react-native';
+import { StyleSheet, Text, View, TouchableHighlight, NativeModules, AppRegistry, Button,Platform } from 'react-native';
 
 import { Provider } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { useDispatch } from 'react-redux';
 
-import store from '../redux/store';
+import store from './redux/store';
 
-import { increment } from '../redux/reducer';
-import { decrement } from '../redux/reducer';
-import { reset } from '../redux/reducer';
+import { increment } from './redux/reducer';
+import { decrement } from './redux/reducer';
+import { reset } from './redux/reducer';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
+let MyCustomModule ;
+if(Platform.OS != 'web'){
+  MyCustomModule = NativeModules.MyCustomModule;
+}
 
-
-const MyCustomModule = NativeModules.MyCustomModule;
 
 const AppScreen = () => {
   const dispatch = useDispatch()
@@ -55,10 +57,12 @@ const AppScreen = () => {
 
 
   const counter = useSelector(state => {
-  MyCustomModule.getData(state.counter.toString(), 'param2').then(result => {
-    console.log(result)
-  }
-  );
+    if(Platform.OS !== 'web'){
+      MyCustomModule.getData(state.counter.toString(), 'param2').then(result => {
+        console.log(result)
+      });
+    }
+ 
   return state.counter;
 }
   );
@@ -125,5 +129,10 @@ const styles = StyleSheet.create({
   }
 });
 
-AppRegistry.registerComponent("IntegratedApp", () => App);
-AppRegistry.runApplication('IntegratedApp', {rootTag: document.getElementById('root')});
+  AppRegistry.registerComponent("IntegratedApp", () => App);
+  if(Platform.OS === 'web'){
+    AppRegistry.runApplication('IntegratedApp', {rootTag: document.getElementById('root')});
+
+  }
+
+
