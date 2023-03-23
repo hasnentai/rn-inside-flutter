@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:html';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -49,18 +54,15 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-  static const MethodChannel _channel = const MethodChannel("main_channel");
+  static const MethodChannel _channel = MethodChannel("main_channel");
+  static const String CHANNEL_NAME = "my_channel";
+  static const MethodChannel _channel_1 = MethodChannel(CHANNEL_NAME);
+  int? counter;
+  String? storageData;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
   }
 
   @override
@@ -71,6 +73,21 @@ class _MyHomePageState extends State<MyHomePage> {
     // The Flutter framework has been optimized to make rerunning build methods
     // fast, so that you can just rebuild anything that needs updating rather
     // than having to individually change instances of widgets.
+
+    _channel_1.setMethodCallHandler((call) async {
+      if (call.method == "receiveMessage") {
+        String message = call.arguments as String;
+        setState(() {
+          counter = int.parse(message);
+        });
+      } else if (call.method == "storeData") {
+        String message = call.arguments as String;
+        setState(() {
+          storageData = message;
+        });
+        debugPrint(message);
+      }
+    });
     return Scaffold(
       appBar: AppBar(
         // Here we take the value from the MyHomePage object that was created by
@@ -97,9 +114,42 @@ class _MyHomePageState extends State<MyHomePage> {
           // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            if (counter != null) ...[
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text(
+                  "Redux Store from RN",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Text(
+                '$counter',
+                style: const TextStyle(
+                  fontSize: 90,
+                  color: Colors.black54,
+                ),
+              ),
+            ],
+            if (storageData != null) ...[
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text(
+                  "Local Storage Data from RN",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  '$storageData',
+                  style: const TextStyle(),
+                ),
+              ),
+            ],
             ElevatedButton(
-                onPressed: _getNewActivity,
-                child: const Text("Open React Native View")),
+              onPressed: _getNewActivity,
+              child: const Text("Open React Native View"),
+            ),
           ],
         ),
       ),
@@ -112,10 +162,91 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   _getNewActivity() async {
-    try {
-      await _channel.invokeMethod('startRNActivity');
-    } on PlatformException catch (e) {
-      print(e.message);
+    if (kIsWeb) {
+      var res = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => IframeDemo()),
+      );
+
+      setState(() {
+        counter = res["counter"];
+      });
+    } else {
+      try {
+        await _channel.invokeMethod('startRNActivity');
+      } on PlatformException catch (e) {
+        print(e.message);
+      }
     }
+  }
+}
+
+class IframeDemo extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() {
+    return MyWidget();
+  }
+}
+
+class MyWidget extends State<IframeDemo> {
+  late String _url;
+  late IFrameElement _iframeElement;
+  int counter = 0;
+
+  @override
+  initState() {
+    super.initState();
+    _url = 'http://localhost:3000';
+    _iframeElement = IFrameElement()
+      ..src = _url
+      ..id = 'iframeElement'
+      ..allow = "cross-origin-isolated"
+      ..style.border = 'none';
+    // ignore: undefined_prefixed_name
+    ui.platformViewRegistry.registerViewFactory(
+      'iframeElement',
+      (int viewId) => _iframeElement,
+    );
+
+    window.addEventListener('message', (event) {
+      var data = (event as MessageEvent).data ?? '-';
+      var d = json.decode(data);
+
+      if (d["event-id"] == "redux-data") {
+        setState(() {
+          var data = d["data"];
+          counter = data["counter"];
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('url is $_url');
+
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, {"counter": counter});
+        return false;
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          SizedBox(
+            height: 100,
+          ),
+          SizedBox(
+            height: 300,
+            width: 600,
+            child: HtmlElementView(
+              // key: UniqueKey(),
+              viewType: 'iframeElement',
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
