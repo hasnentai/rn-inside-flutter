@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 let MyCustomModule ;
+let iframe;
 if(Platform.OS != 'web'){
   MyCustomModule = NativeModules.MyCustomModule;
 }
@@ -53,6 +54,10 @@ const AppScreen = () => {
 
   useEffect(()=>{
     storeData(val);
+    
+   
+   
+
   },[]);
 
 
@@ -61,6 +66,22 @@ const AppScreen = () => {
       MyCustomModule.getData(state.counter.toString(), 'param2').then(result => {
         console.log(result)
       });
+    } else {
+      window.setTimeout(() => {
+      
+        const jsonValue = {
+         "event-id":"redux-data",
+         "data":{
+          "counter":state.counter
+         }
+        }
+        
+        var myIframe = document.getElementById('iframeElement');
+        console.log(myIframe)
+        iframe = window.parent.postMessage(JSON.stringify(jsonValue), "*");
+        // use the iframe variable here
+       
+      }, 0);
     }
  
   return state.counter;

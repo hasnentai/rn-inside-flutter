@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:html';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -111,8 +115,8 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             if (counter != null) ...[
-              Padding(
-                padding: const EdgeInsets.all(8.0),
+              const Padding(
+                padding: EdgeInsets.all(8.0),
                 child: Text(
                   "Redux Store from RN",
                   style: TextStyle(fontWeight: FontWeight.bold),
@@ -120,15 +124,15 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
               Text(
                 '$counter',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 90,
                   color: Colors.black54,
                 ),
               ),
             ],
             if (storageData != null) ...[
-              Padding(
-                padding: const EdgeInsets.all(8.0),
+              const Padding(
+                padding: EdgeInsets.all(8.0),
                 child: Text(
                   "Local Storage Data from RN",
                   style: TextStyle(fontWeight: FontWeight.bold),
@@ -138,13 +142,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 padding: const EdgeInsets.all(8.0),
                 child: Text(
                   '$storageData',
-                  style: TextStyle(),
+                  style: const TextStyle(),
                 ),
               ),
             ],
             ElevatedButton(
-                onPressed: _getNewActivity,
-                child: const Text("Open React Native View")),
+              onPressed: _getNewActivity,
+              child: const Text("Open React Native View"),
+            ),
           ],
         ),
       ),
@@ -157,10 +162,91 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   _getNewActivity() async {
-    try {
-      await _channel.invokeMethod('startRNActivity');
-    } on PlatformException catch (e) {
-      print(e.message);
+    if (kIsWeb) {
+      var res = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => IframeDemo()),
+      );
+
+      setState(() {
+        counter = res["counter"];
+      });
+    } else {
+      try {
+        await _channel.invokeMethod('startRNActivity');
+      } on PlatformException catch (e) {
+        print(e.message);
+      }
     }
+  }
+}
+
+class IframeDemo extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() {
+    return MyWidget();
+  }
+}
+
+class MyWidget extends State<IframeDemo> {
+  late String _url;
+  late IFrameElement _iframeElement;
+  int counter = 0;
+
+  @override
+  initState() {
+    super.initState();
+    _url = 'http://localhost:3000';
+    _iframeElement = IFrameElement()
+      ..src = _url
+      ..id = 'iframeElement'
+      ..allow = "cross-origin-isolated"
+      ..style.border = 'none';
+    // ignore: undefined_prefixed_name
+    ui.platformViewRegistry.registerViewFactory(
+      'iframeElement',
+      (int viewId) => _iframeElement,
+    );
+
+    window.addEventListener('message', (event) {
+      var data = (event as MessageEvent).data ?? '-';
+      var d = json.decode(data);
+
+      if (d["event-id"] == "redux-data") {
+        setState(() {
+          var data = d["data"];
+          counter = data["counter"];
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('url is $_url');
+
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, {"counter": counter});
+        return false;
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          SizedBox(
+            height: 100,
+          ),
+          SizedBox(
+            height: 300,
+            width: 600,
+            child: HtmlElementView(
+              // key: UniqueKey(),
+              viewType: 'iframeElement',
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
